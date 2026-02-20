@@ -1,0 +1,5 @@
+*.db
+开发指南.txt
+__pycache__/
+*.pyc
+.vscode/
