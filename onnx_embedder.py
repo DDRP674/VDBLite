@@ -5,8 +5,8 @@ import onnxruntime as ort
 
 class Embedder:
     def __init__(self,
-                 onnx_path: str = "model-int8.onnx",
-                 tokenizer: str = "tokenizer.json",
+                 onnx_path: str = "./model/model-int8.onnx",
+                 tokenizer: str = "./model/tokenizer.json",
                  model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
                  providers=None,
                  max_length: int = 128):
