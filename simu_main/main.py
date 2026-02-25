@@ -26,6 +26,17 @@ def output_thread():
         output_dict = stdout_decode(output)
         if output_dict: output_queue.put(output_dict)
 
+lock = threading.Lock()
+
+def maintain_thread():
+    while True:
+        with lock:
+            process.stdin.write(stdin_input({"func_name": "maintain", "kwargs": {}})) 
+            process.stdin.flush()
+            output = output_queue.get()
+            print(output)
+        time.sleep(5)
+
 threading.Thread(target=output_thread, daemon=True).start()
 
 a = "今天天气很好"
@@ -48,23 +59,32 @@ while True:
     output = output_queue.get()
     if output == {"signal": "ready"}: break
 
+threading.Thread(target=maintain_thread, daemon=True).start() # 一定要在准备就绪后开启维护线程
+
+
+print("测试开始")
 start = time.time()
-for i in range(1000):
+for i in range(10):
     process.stdin.write(stdin_input({"func_name": "insert_with_reduce_without_repeat", "kwargs": {"text": str(uuid.uuid4())}})) 
     process.stdin.flush()
     output = output_queue.get()
+    if output: print(f"子进程输出：{output}")
 
 print(f"插入耗时：{time.time()-start}")
 
-for func_name, kwargs in cmds:
-    print(func_name, kwargs)
-    start = time.time()
-    process.stdin.write(stdin_input({"func_name": func_name, "kwargs": kwargs}))
-    process.stdin.flush()  # 强制写入，不缓存
+time.sleep(10)
 
-    output = output_queue.get()
-    if output: print(f"子进程输出：{output}")
-    print(f"耗时：{time.time()-start}")
-    # process.stdout.flush()
+for func_name, kwargs in cmds:
+    with lock:
+        print(func_name, kwargs)
+        start = time.time()
+        process.stdin.write(stdin_input({"func_name": func_name, "kwargs": kwargs}))
+        process.stdin.flush()  # 强制写入，不缓存
+
+        output = output_queue.get()
+        if output: print(f"子进程输出：{output}")
+        print(f"耗时：{time.time()-start}")
+
+input("测试完毕")
 
     

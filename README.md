@@ -20,6 +20,7 @@ Input format:
 {"func_name": "get_id_by_text", "kwargs": {"text": ""}}  
 {"func_name": "delete", "kwargs": {"id": int}}  
 {"func_name": "update", "kwargs": {"id": int, "text": ""}}  
+{"func_name": "maintain"} *This signal must be sent every 30 seconds, otherwise the process will end*  
 {"func_name": "stop"}  
 
 Output format:  
@@ -29,5 +30,6 @@ Output format:
 {"func_name": "get_id_by_text", "result": id}  
 {"func_name": "delete", "result": "ok"}  
 {"func_name": "update", "result": "ok"}  
+{"func_name": "maintain", "result": "ok"}  
 
 Error format: {"status": "error", "info": str}  

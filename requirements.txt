@@ -1,0 +1,4 @@
+numpy
+nuitka
+onnxruntime
+tokenizers

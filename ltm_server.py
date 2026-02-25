@@ -1,4 +1,4 @@
-import json, queue, threading
+import json, queue, threading, time
 from VectorDatabase import VectorDatabase
 import sys
 
@@ -12,13 +12,16 @@ def json_obj_output(json_object: dict):
 class server:
     def __init__(self, database_name="vdb.db", max_size=10000):
         self.running = False
+        self.lock = threading.Lock()
         self.input_queue = queue.Queue()
         self.vdb = VectorDatabase(database_name, max_size)
+        self.maintain_counter = 0
         json_obj_output({"signal": "ready"})
 
     def run(self): 
         self.running = True
         threading.Thread(target=self.input_thread, daemon=True).start()
+        threading.Thread(target=self.maintain_thread, daemon=True).start()
         self.processing()
 
     def processing(self):
@@ -30,13 +33,13 @@ class server:
                     json_obj_output({"status": "error", "info": "No function specified"})
                     continue
 
-                if cmd["func_name"] == "insert":
+                elif cmd["func_name"] == "insert":
                     text = cmd.get("kwargs", {}).get("text", "").strip()
                     if text: self.vdb.insert(text)
                     json_obj_output({"func_name": "insert", "result": "ok"})
                     continue
 
-                if cmd["func_name"] == "insert_with_reduce": 
+                elif cmd["func_name"] == "insert_with_reduce": 
                     text = cmd.get("kwargs", {}).get("text", "").strip()
                     if text: 
                         self.vdb.insert(text)
@@ -44,7 +47,7 @@ class server:
                     json_obj_output({"func_name": "insert_with_reduce", "result": "ok"})
                     continue
 
-                if cmd["func_name"] == "insert_with_reduce_without_repeat":
+                elif cmd["func_name"] == "insert_with_reduce_without_repeat":
                     text = cmd.get("kwargs", {}).get("text", "").strip()
                     if text: 
                         if self.vdb.get_id_by_text(text) == -1: 
@@ -53,13 +56,13 @@ class server:
                     json_obj_output({"func_name": "insert_with_reduce_without_repeat", "result": "ok"})
                     continue
 
-                if cmd["func_name"] == "reduce":
+                elif cmd["func_name"] == "reduce":
                     n = cmd.get("kwargs", {}).get("n", 0)
                     self.vdb.reduce(n)
                     json_obj_output({"func_name": "reduce", "result": "ok"})
                     continue
 
-                if cmd["func_name"] == "search":
+                elif cmd["func_name"] == "search":
                     kwargs = cmd.get("kwargs", {})
                     text = kwargs.get("text", "").strip()
                     k = kwargs.get("k", 5)
@@ -68,11 +71,11 @@ class server:
                     json_obj_output({"func_name": "search", "result": res})
                     continue
 
-                if cmd["func_name"] == "get_size":
+                elif cmd["func_name"] == "get_size":
                     json_obj_output({"func_name": "get_size", "result": self.vdb.get_size()})
                     continue
 
-                if cmd["func_name"] == "get_text_by_id":
+                elif cmd["func_name"] == "get_text_by_id":
                     kwargs = cmd.get("kwargs", {})
                     id_val = kwargs.get("id", None)
                     try: id_int = int(id_val)
@@ -85,7 +88,7 @@ class server:
                     except Exception as e: json_obj_output({"status": "error", "info": str(e)})
                     continue
                 
-                if cmd["func_name"] == "get_id_by_text":
+                elif cmd["func_name"] == "get_id_by_text":
                     kwargs = cmd.get("kwargs", {})
                     text = kwargs.get("text", "").strip()
                     if not text:
@@ -97,7 +100,7 @@ class server:
                     except Exception as e: json_obj_output({"status": "error", "info": str(e)})
                     continue
                 
-                if cmd["func_name"] == "delete":
+                elif cmd["func_name"] == "delete":
                     kwargs = cmd.get("kwargs", {})
                     id_val = kwargs.get("id", None)
                     try: id_int = int(id_val)
@@ -110,7 +113,7 @@ class server:
                     except Exception as e: json_obj_output({"status": "error", "info": str(e)})
                     continue
                 
-                if cmd["func_name"] == "update":
+                elif cmd["func_name"] == "update":
                     kwargs = cmd.get("kwargs", {})
                     id_val = kwargs.get("id", None)
                     text = kwargs.get("text", "").strip()
@@ -119,13 +122,17 @@ class server:
                         json_obj_output({"status": "error", "info": "Invalid id"})
                         continue
                     try:
-                        self.vdb.update(id_int, text)
+                        if text: self.vdb.update(id_int, text)
                         json_obj_output({"func_name": "update", "result": "ok"})
                     except Exception as e: json_obj_output({"status": "error", "info": str(e)})
                     continue
 
-                if cmd["func_name"] == "stop": 
-                    self.vdb.stop() 
+                elif cmd["func_name"] == "maintain":
+                    with self.lock: self.maintain_counter = 0
+                    json_obj_output({"func_name": "maintain", "result": "ok"})
+                    continue
+
+                elif cmd["func_name"] == "stop": 
                     self.stop()
                     json_obj_output({"signal": "exit"})
                     continue
@@ -136,7 +143,9 @@ class server:
 
             except Exception as e: json_obj_output({"status": "error", "info": str(e)})
 
-    def stop(self): self.running = False
+    def stop(self): 
+        if self.vdb.running: self.vdb.stop() 
+        self.running = False
 
     # 线程
 
@@ -148,6 +157,14 @@ class server:
                 json_obj_output({"status": "error", "info": str(e)})
                 continue
             self.input_queue.put(cmd)
+
+    def maintain_thread(self):
+        while self.running:
+            with self.lock: 
+                self.maintain_counter += 1
+                if self.maintain_counter > 10: break
+            time.sleep(1)
+        self.input_queue.put({"func_name": "stop"})
 
 if __name__ == "__main__":
     s = server()

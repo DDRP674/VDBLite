@@ -22,6 +22,8 @@ class VectorDatabase:
         self.db.load_extension(vec_dll_path)
         self.db.enable_load_extension(False)
 
+        self.running = True
+
         # Embedding Initialization
         self.embedder = Embedder()
         self.dim = self.embedder.get_shape()[0]
@@ -133,7 +135,9 @@ class VectorDatabase:
             row = cur.fetchone()
             return row[0] if row else ""
 
-    def stop(self): self.db.close()
+    def stop(self): 
+        self.db.close()
+        self.running = False
 
 if __name__ == "__main__":
     vdb = VectorDatabase()
